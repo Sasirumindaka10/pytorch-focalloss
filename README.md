@@ -16,6 +16,8 @@ The multi-class focal loss is a logical extension of the original binary focal l
 
 It is built on top of PyTorch's `CrossEntropyLoss` class, and supports all of the same arguments. The `weight` argument is given as `alpha` (but can alternatively be given as `weight` for drop-in compatability with `CrossEntropyLoss`), and the `reduction`, `ignore_index`, and `label_smoothing` arguments are the same as for `CrossEntropyLoss`.
 
+Note that one difference from `CrossEntropyLoss` is that if all samples have target value `ignore_index`, then `MultiClassFocalLoss` returns 0 where `CrossEntropyLoss` would return `nan`.
+
 ## Demo
 
 See below or check out `DEMO.ipynb` above for a demonstration of how the binary and multi-class focal losses work and compare to the standard cross entropy versions.

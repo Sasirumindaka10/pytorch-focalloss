@@ -112,7 +112,7 @@ class BinaryFocalLoss(Module):
                     f"got {alpha} of type {type(alpha)}"
                 )
         elif pos_weight is not None:
-            assert isinstance(weight, Tensor), (
+            assert isinstance(pos_weight, Tensor), (
                 "pos_weight/alpha must be tensor or None, "
                 f"got {pos_weight} of type {type(pos_weight)}"
             )
@@ -181,6 +181,10 @@ class MultiClassFocalLoss(Module):
 
     This implementation also supports the ``ignore_index` and
     `label_smoothing` arguments from PyTorch's `CrossEntropyLoss` class
+
+    Note that one difference from `CrossEntropyLoss` is that if all
+    samples have target value `ignore_index`, then `MultiClassFocalLoss`
+    returns 0 where `CrossEntropyLoss` would return `nan`.
     """
 
     def __init__(
@@ -308,14 +312,22 @@ class MultiClassFocalLoss(Module):
 
         # apply reduction option to loss and return
         if self.reduction == "mean":
-            # CrossEntropyLoss "mean" divides by effective number of samples
+            # CrossEntropyLoss "mean" divides by effective number of samples,
+            # including checks for ignored index
             if self.alpha is not None:
-                weighted_sample_num = (
-                    Tensor([self.alpha[val] for val in target]).sum().item()
-                )
+                weighted_sample_num = Tensor(
+                    [
+                        self.alpha[val] if val != self.ignore_index else 0
+                        for val in target
+                    ]
+                ).sum()
             else:
-                weighted_sample_num = len(target)
-
+                weighted_sample_num = Tensor(
+                    [1 for val in target if val != self.ignore_index]
+                ).sum()
+            if weighted_sample_num.item() == 0:
+                # if all targets ignored, we want to return 0, not nan
+                return Tensor([0.0])
             return loss.sum() / weighted_sample_num
         if self.reduction == "sum":
             return loss.sum()
