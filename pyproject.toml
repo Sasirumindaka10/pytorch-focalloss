@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["torch_focalloss"]
+
+[project]
+name = "pytorch-focalloss"
+version = "0.1.0"
+requires-python = ">= 3.11"
+authors = [
+  {name = "Danny Collinson", email = "dannycollinson12@gmail.com"}
+]
+maintainers = [
+  {name = "Danny Collinson", email = "dannycollinson12@gmail.com"}
+]
+description = "PyTorch implementations of binary and multi-class focal loss"
+dependencies = ["torch"]
+readme = "README.md"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+keywords = ["focal loss", "pytorch", "loss", "function", "focal"]
+
+[project.urls]
+Homepage = "https://github.com/dannycollinson/multi_class_focal_loss"
+Repository = "https://github.com/dannycollinson/multi_class_focal_loss"
+Issues = "https://github.com/dannycollinson/multi_class_focal_loss/issues"
