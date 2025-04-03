@@ -9,7 +9,7 @@ include = ["torch_focalloss"]
 [project]
 name = "pytorch-focalloss"
 version = "0.1.0"
-requires-python = ">= 3.11"
+requires-python = ">= 3.8"
 authors = [
   {name = "Danny Collinson", email = "dannycollinson12@gmail.com"}
 ]
@@ -17,7 +17,7 @@ maintainers = [
   {name = "Danny Collinson", email = "dannycollinson12@gmail.com"}
 ]
 description = "PyTorch implementations of binary and multi-class focal loss"
-dependencies = ["torch"]
+dependencies = ["torch >= 1.10.0"]
 readme = "README.md"
 classifiers = [
   "Development Status :: 4 - Beta",
