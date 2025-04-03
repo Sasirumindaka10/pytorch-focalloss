@@ -8,7 +8,7 @@ include = ["torch_focalloss"]
 
 [project]
 name = "pytorch-focalloss"
-version = "0.1.1"
+version = "1.0.0"
 requires-python = ">= 3.8"
 authors = [
   {name = "Danny Collinson", email = "dannycollinson12@gmail.com"}
@@ -32,6 +32,6 @@ license-files = ["LICEN[CS]E*"]
 keywords = ["focal loss", "pytorch", "loss", "function", "focal"]
 
 [project.urls]
-Homepage = "https://github.com/dannycollinson/multi_class_focal_loss"
-Repository = "https://github.com/dannycollinson/multi_class_focal_loss"
-Issues = "https://github.com/dannycollinson/multi_class_focal_loss/issues"
+Homepage = "https://github.com/dannycollinson/pytorch-focalloss"
+Repository = "https://github.com/dannycollinson/pytorch-focalloss"
+Issues = "https://github.com/dannycollinson/pytorch-focalloss/issues"

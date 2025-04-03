@@ -180,4 +180,4 @@ cython_debug/
 # LSP config files
 pyrightconfig.json
 
-scratch*
+scratch.ipynb

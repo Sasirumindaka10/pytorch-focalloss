@@ -60,7 +60,7 @@ class BinaryFocalLoss(Module):
                 weight given to the loss of each batch element.
                 If given, has to be a Tensor of size `nbatch`."
                 Defaults to `None`.
-            pow_weight (Tensor | None, optional): alternate name for
+            pos_weight (Tensor | None, optional): alternate name for
                 specifying `alpha`. Included for drop-in compatibility
                 with `BCEWithLogitsLoss`. Ignored if `alpha` is not
                 `None`. Defaults to `None`.
@@ -99,7 +99,7 @@ class BinaryFocalLoss(Module):
 
         # make sure gamma is numeric
         assert isinstance(
-            1, (int, float)
+            gamma, (int, float)
         ), f"Gamma must be a float, got {gamma} of type {type(gamma)}"
 
         # check alpha
@@ -179,7 +179,7 @@ class MultiClassFocalLoss(Module):
     Note that the alpha parameter's meaning differs somewhat from its
     meaning in Lin et al.'s original binary focal loss
 
-    This implementation also supports the ``ignore_index` and
+    This implementation also supports the `ignore_index` and
     `label_smoothing` arguments from PyTorch's `CrossEntropyLoss` class
 
     Note that one difference from `CrossEntropyLoss` is that if all
@@ -221,7 +221,7 @@ class MultiClassFocalLoss(Module):
                 applicable when the target contains class indices."
                 Defaults to `-100`.
             label_smoothing (float): identical to the `label_smoothing`
-                argumnet to `CrossEntropyLoss`: "A float in [0.0, 1.0].
+                argument to `CrossEntropyLoss`: "A float in [0.0, 1.0].
                 Specifies the amount of smoothing when computing the
                 loss, where 0.0 means no smoothing. The targets become a
                 mixture of the original ground truth and a uniform
@@ -246,7 +246,7 @@ class MultiClassFocalLoss(Module):
 
         # make sure gamma is numeric
         assert isinstance(
-            1, (int, float)
+            gamma, (int, float)
         ), f"Gamma must be a float, got {gamma} of type {type(gamma)}"
 
         # check alpha

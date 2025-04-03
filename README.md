@@ -12,7 +12,7 @@ pip install pytorch-focalloss
 
 ### Usage
 
-The python package is importable as `torch_focalloss`. The only components in the package are the `BinaryFocalLoss` and `MultiClassFocalLoss` classes, which have interfaces that allow them to be drop-in replacements for PyTorch's `BCEWithLogitsLoss` and `CrossEntropyLoss` classes, respectively. All of the same keyword arguments are supported, as well as the focusing parameter `$\gamma$ (gamma), and they function just like any other PyTorch loss function.
+The python package is importable as `torch_focalloss`. The only components in the package are the `BinaryFocalLoss` and `MultiClassFocalLoss` classes, which have interfaces that allow them to be drop-in replacements for PyTorch's `BCEWithLogitsLoss` and `CrossEntropyLoss` classes, respectively. All of the same keyword arguments are supported, as well as the focusing parameter $\gamma$ (gamma), and they function just like any other PyTorch loss function.
 
 ### About
 
@@ -98,7 +98,9 @@ print(f"Focal Loss: {bfl(preds, target).item():.5f}")
     Focal Loss: 1.11491
 
 
-Note that our $\alpha$ is similar, but not identical, to the one in Lin et al.'s "Focal Loss for Dense Object Detection" (https://arxiv.org/abs/1708.02002). Both implementations use $\alpha$ as the weight for the positive class, but Lin et al. uses $(1-\alpha)$ as the weight for the negative class, whereas our implementation implicitly uses $1$ as the weight for the negative class. This means that Lin et al.'s $\alpha$ is constrained to $[0,1]$, but ours is unbounded. The formula $\alpha=\frac{\alpha_{*}}{1-\alpha_{*}}$, where $\alpha_{*}$ is the $\alpha$ from Lin et al., converts between the two. However, to eliminate balancing and replicate the behavior for $\alpha=\mathbf{1}$ using the Lin et al. implementation, we must set $\alpha_{*}=\frac{1}{2}$ and multiply the final loss by 2, which demonstrates that the conversion is not 1-to-1 when it comes to training behavior and requires reevaluation of the learning rate in particular, generally requiring lower learning rates in our implementation compared to Lin et al. for $\alpha>1$ and greater for $\alpha<1$.
+Note that our $\alpha$ is similar, but not identical, to the one in Lin et al.'s "Focal Loss for Dense Object Detection" (https://arxiv.org/abs/1708.02002). Both implementations use $\alpha$ as the weight for the positive class, but Lin et al. uses $(1-\alpha)$ as the weight for the negative class, whereas our implementation implicitly uses $1$ as the weight for the negative class. This means that Lin et al.'s $\alpha$ is constrained to $[0,1]$, but ours is unbounded.
+
+The formula $\alpha = L / (1-L)$, where $L$ is the $\alpha$ from Lin et al., converts between the two. However, to eliminate balancing and replicate the behavior for $\alpha=1$ using the Lin et al. implementation, we must set $L=0.5$ and multiply the final loss by 2, which demonstrates that the conversion is not 1-to-1 when it comes to training behavior. Notably, it requires reevaluation of the learning rate in particular, generally requiring lower learning rates in our implementation compared to Lin et al. for $\alpha>1$ and higher learning rates for $\alpha<1$.
 
 Focal loss differs from binary cross entropy loss when $\gamma\neq0$. Technically, $\gamma$ can be less than $0$, but this would increase focus on easy samples and defocus hard samples, which is the opposite of why focal loss is effective. Thus, we will show what happens when $\gamma>0$.
 
