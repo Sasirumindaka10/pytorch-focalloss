@@ -1,6 +1,8 @@
 """PyTorch focal loss function implementations for torch_focalloss"""
 
-from torch import Tensor, arange  # pylint: disable=no-name-in-module
+# pylint: disable=no-name-in-module
+from torch import Tensor, arange, topk, zeros, int64
+from torch import bool as torch_bool
 from torch.nn import (
     BCEWithLogitsLoss,
     CrossEntropyLoss,
@@ -8,6 +10,7 @@ from torch.nn import (
     Sigmoid,
     Softmax,
 )
+from torch.nn.functional import one_hot
 
 
 class BinaryFocalLoss(Module):
@@ -176,6 +179,10 @@ class MultiClassFocalLoss(Module):
     Dense Object Detection" (https://arxiv.org/abs/1708.02002) and
     addapted to support classification tasks with more than two classes
 
+    Class index targets should be prefered whenever possible to class
+    probability targets. This does not include using the
+    `label_smoothing` parameter or the `alpha`/`weight` parameter.
+
     Note that the alpha parameter's meaning differs somewhat from its
     meaning in Lin et al.'s original binary focal loss
 
@@ -195,6 +202,8 @@ class MultiClassFocalLoss(Module):
         ignore_index: int = -100,
         label_smoothing: float = 0.0,
         weight: Tensor | None = None,
+        focus_on: int | float = 1,
+        sum_first: bool = True,
     ) -> None:
         """
         Initialize multi-class focal loss function
@@ -231,6 +240,18 @@ class MultiClassFocalLoss(Module):
                 specifying `alpha`. Included for drop-in compatibility
                 with `CrossEntropyLoss`. Ignored if `alpha` is not
                 `None`. Defaults to `None`.
+            focus_on (int | float): if using class probabilities as
+                targets, determines which classes focusing is applied to
+                for each sample. If a positive `int`, then the
+                `focus_on` top classes according to probability for the
+                sample will be considered. If `focus_on=-1`, then all
+                classes will be considered. If a `float` in the range
+                `(0, 1)`, then any class with a probability of above
+                `focus_on` will be considered. Defaults to 1.
+            sum_first (bool): if using class probabilities as targets
+                with `focus_max_only=False`, determines if summation of
+                errors occurs before or after gamma is applied. Ignored
+                if `focus_max_only=True`. Defaults to True.
         """
         super().__init__()  # type: ignore
 
@@ -263,6 +284,16 @@ class MultiClassFocalLoss(Module):
             # use weight in place of alpha for drop-in compatability
             alpha = weight
 
+        # make sure focus_on is valid
+        if isinstance(focus_on, int):
+            assert (
+                focus_on == -1 or focus_on >= 1
+            ), f"If an int, focus_on must be -1 or >= 1, got {focus_on}"
+        else:
+            assert (
+                0 < focus_on < 1
+            ), f"If a float, focus_on must be in (0, 1), got {focus_on}"
+
         # components
         self.cross_entropy = CrossEntropyLoss(
             reduction="none",
@@ -278,10 +309,12 @@ class MultiClassFocalLoss(Module):
 
         # other parameters
         self.label_smoothing = label_smoothing
+        self.focus_on = focus_on
 
         # settings
         self.reduction = reduction
         self.ignore_index = ignore_index
+        self.sum_first = sum_first
 
     def forward(self, inputs: Tensor, target: Tensor) -> Tensor:
         """
@@ -291,6 +324,9 @@ class MultiClassFocalLoss(Module):
             inputs (Tensor): (unnormalized) prediction logits
                 of shape `[batch_size, num_classes]`
             target (Tensor): true labels of shape `[batch_size,]`
+                if targets are class indices
+                or of shape `[batch_size, num_classes]`
+                if targets are class probabilities
 
         Returns:
             Tensor: loss tensor with reduction applied
@@ -298,36 +334,95 @@ class MultiClassFocalLoss(Module):
         # calculate regular cross entropy loss
         cross_entropy_loss = self.cross_entropy(inputs, target)
 
-        # calculate predicted class probabilities for correct classes
-        probabilities = self.softmax(inputs)[arange(target.shape[0]), target]
-
-        # calculate focusing if needed
-        if self.gamma != 0:
+        # calculate focusing
+        if self.gamma == 0:
+            # no focusing needed
+            focus = 1  # dummy
+        elif len(target.shape) == 1:
+            # target is class indices
+            probabilities = self.softmax(inputs)[
+                arange(0, target.shape[0]), target.type(int64)
+            ]
             focus = (1 - probabilities) ** self.gamma
         else:
-            focus = 1  # dummy
+            # target is class probabilities
+            probabilities = self.softmax(inputs)
+
+            # compute focus
+            if self.focus_on == -1:
+                focus = (target - probabilities).abs()
+
+                # reduce dimension of focus according to sum_first
+                if self.sum_first:
+                    focus = focus.sum(dim=1) ** self.gamma  # type: ignore
+                else:
+                    focus = (focus**self.gamma).sum(dim=1)
+
+            elif isinstance(self.focus_on, int):
+                # create mask for which entries to focus on
+                focus_mask = one_hot(  # pylint: disable=not-callable
+                    topk(target, self.focus_on, dim=1).indices,
+                    num_classes=target.shape[1],
+                )
+                focus_mask = focus_mask.sum(dim=1).type(torch_bool).squeeze()
+
+                # compute focus and apply mask
+                focus = (target - probabilities).abs()[focus_mask]
+                focus = focus.view(  # type: ignore
+                    target.shape[0], self.focus_on
+                )
+
+                # reduce dimension of focus according to sum_first
+                if self.sum_first:
+                    focus = focus.sum(dim=1) ** self.gamma  # type: ignore
+                else:
+                    focus = (focus**self.gamma).sum(dim=1)
+
+            else:
+                focus_mask = target > self.focus_on
+                # don't know how many per row are focused, so calculate by row
+                diff = (target - probabilities).abs()
+                focus = zeros((target.shape[0],))  # type: ignore
+                for i, row_focus_mask in enumerate(focus_mask):
+                    if self.sum_first:
+                        focus[i] += (  # type: ignore
+                            diff[i, row_focus_mask].sum() ** self.gamma
+                        )
+                    else:
+                        focus[i] += (  # type: ignore
+                            diff[i, row_focus_mask] ** self.gamma
+                        ).sum()
 
         # apply focusing
         loss = focus * cross_entropy_loss
 
         # apply reduction option to loss and return
         if self.reduction == "mean":
-            # CrossEntropyLoss "mean" divides by effective number of samples,
-            # including checks for ignored index
-            if self.alpha is not None:
-                weighted_sample_num = Tensor(
-                    [
-                        self.alpha[val] if val != self.ignore_index else 0
-                        for val in target
-                    ]
-                ).sum()
+            # CrossEntropyLoss "mean" divides by effective number of samples
+            if len(target.shape) == 1:
+                # target is class indices, so ignore_index is checked
+                if self.alpha is not None:
+                    weighted_sample_num = Tensor(
+                        [
+                            self.alpha[val] if val != self.ignore_index else 0
+                            for val in target
+                        ]
+                    ).sum()
+                else:
+                    weighted_sample_num = Tensor(
+                        [1 for val in target if val != self.ignore_index]
+                    ).sum()
+                if weighted_sample_num.item() == 0:
+                    # if all targets ignored, we want to return 0, not nan
+                    return Tensor([0.0])
             else:
-                weighted_sample_num = Tensor(
-                    [1 for val in target if val != self.ignore_index]
-                ).sum()
-            if weighted_sample_num.item() == 0:
-                # if all targets ignored, we want to return 0, not nan
-                return Tensor([0.0])
+                # target is class probabilities, so no ignore_index
+                if self.alpha is not None:
+                    weighted_sample_num = (
+                        self.alpha * target.sum(dim=0)
+                    ).sum()
+                else:
+                    weighted_sample_num = target.shape[0]  # type: ignore
             return loss.sum() / weighted_sample_num
         if self.reduction == "sum":
             return loss.sum()
